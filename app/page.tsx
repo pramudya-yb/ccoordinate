@@ -103,9 +103,22 @@ export default function Page() {
     return null;
   };
 
-  const onGmapsLink = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setGmapsLink(e.target.value);
-    const parsed = parseGmaps(e.target.value);
+  const onGmapsLink = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setGmapsLink(url);
+    
+    let finalUrl = url;
+    const isShortLink = url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps') || url.includes('goo.gl');
+    
+    if (isShortLink) {
+      try {
+        const res = await fetch(`/api/resolve-link?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (data.finalUrl) finalUrl = data.finalUrl;
+      } catch { /* ignore */ }
+    }
+    
+    const parsed = parseGmaps(finalUrl);
     if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lon)) {
       setEditingTm3(false);
       setCoords(parsed);
