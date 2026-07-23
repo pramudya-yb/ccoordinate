@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { wgs84ToTm3, tm3ToWgs84, TM3_ZONES } from '@/lib/tm3';
 import { ddToDmsString, ddToDms, dmsToDd } from '@/lib/conversion';
 import Papa from 'papaparse';
-import { Navigation, Globe, MapPin, Check, Copy, ChevronDown, UploadCloud, Sun, Moon } from 'lucide-react';
+import { Navigation, Globe, MapPin, Check, Copy, ChevronDown, UploadCloud, Sun, Moon, Link } from 'lucide-react';
 
 /* ── Shared input style using CSS vars ── */
 const inp = 'w-full px-2.5 py-2 rounded-lg text-xs font-mono outline-none transition-all bg-[var(--inp-bg)] border border-[var(--inp-border)] text-[var(--text)] focus:ring-2 focus:ring-[var(--inp-focus)] focus:border-[var(--inp-focus)]';
@@ -53,6 +53,7 @@ export default function Page() {
     return { latDeg: la.deg, latMin: la.min, latSec: la.sec, latDir: la.dir, lonDeg: lo.deg, lonMin: lo.min, lonSec: lo.sec, lonDir: lo.dir };
   });
   const [csvMsg, setCsvMsg] = useState('');
+  const [gmapsLink, setGmapsLink] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Apply dark class to <html> — only side-effect that belongs in useEffect
@@ -88,6 +89,27 @@ export default function Page() {
     const next = { ...dmsDerived, [e.target.name]: e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value };
     setDmsRaw(next);
     setCoords({ lat: dmsToDd(next.latDeg, next.latMin, next.latSec, next.latDir), lon: dmsToDd(next.lonDeg, next.lonMin, next.lonSec, next.lonDir) });
+  };
+
+  const parseGmaps = (url: string) => {
+    const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
+    const bangMatch = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    if (bangMatch) return { lat: parseFloat(bangMatch[1]), lon: parseFloat(bangMatch[2]) };
+    const queryMatch = url.match(/(?:q|query|ll|center)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (queryMatch) return { lat: parseFloat(queryMatch[1]), lon: parseFloat(queryMatch[2]) };
+    const pairMatch = url.match(/place\/([-+]?\d+\.?\d*),([-+]?\d+\.?\d*)/);
+    if (pairMatch) return { lat: parseFloat(pairMatch[1]), lon: parseFloat(pairMatch[2]) };
+    return null;
+  };
+
+  const onGmapsLink = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGmapsLink(e.target.value);
+    const parsed = parseGmaps(e.target.value);
+    if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lon)) {
+      setEditingTm3(false);
+      setCoords(parsed);
+    }
   };
 
   const onTm3 = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,6 +244,18 @@ export default function Page() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Google Maps Link Parser */}
+              <div>
+                <SectionLabel icon={Link} label="Google Maps Link" color="text-red-500/70" />
+                <input 
+                  type="text" 
+                  value={gmapsLink} 
+                  onChange={onGmapsLink} 
+                  placeholder="Paste link Google Maps (misal: https://maps.app.goo.gl/...)" 
+                  className={inp} 
+                />
               </div>
 
               {/* Divider */}
