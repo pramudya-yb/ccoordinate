@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { wgs84ToTm3, tm3ToWgs84, TM3_ZONES } from '@/lib/tm3';
 import { ddToDmsString, ddToDms, dmsToDd } from '@/lib/conversion';
 import Papa from 'papaparse';
-import { Navigation, Globe, MapPin, Check, Copy, ChevronDown, UploadCloud, Sun, Moon, Link } from 'lucide-react';
+import { Navigation, Globe, MapPin, Check, Copy, ChevronDown, UploadCloud, Sun, Moon, Link, Loader2, AlertCircle } from 'lucide-react';
 
 /* ── Shared input style using CSS vars ── */
 const inp = 'w-full px-2.5 py-2 rounded-lg text-xs font-mono outline-none transition-all bg-[var(--inp-bg)] border border-[var(--inp-border)] text-[var(--text)] focus:ring-2 focus:ring-[var(--inp-focus)] focus:border-[var(--inp-focus)]';
@@ -54,6 +54,7 @@ export default function Page() {
   });
   const [csvMsg, setCsvMsg] = useState('');
   const [gmapsLink, setGmapsLink] = useState('');
+  const [gmapsStatus, setGmapsStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Apply dark class to <html> — only side-effect that belongs in useEffect
