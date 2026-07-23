@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     const response = await fetch(url, {
-      redirect: 'follow',
+      redirect: 'manual',
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -22,10 +22,18 @@ export async function GET(request: NextRequest) {
 
     clearTimeout(timeout);
 
+    const locationHeader = response.headers.get('location') || response.headers.get('Location');
+
+    if (locationHeader) {
+      return NextResponse.json({ 
+        url: locationHeader,
+        finalUrl: locationHeader
+      });
+    }
+
     return NextResponse.json({ 
-      url: response.url,
-      finalUrl: response.url 
-    });
+      error: 'No redirect location found' 
+    }, { status: 404 });
   } catch (error: unknown) {
     const err = error as Error;
     return NextResponse.json({ 

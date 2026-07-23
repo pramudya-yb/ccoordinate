@@ -108,6 +108,13 @@ export default function Page() {
     const url = e.target.value;
     setGmapsLink(url);
     
+    if (!url) {
+      setGmapsStatus('idle');
+      return;
+    }
+    
+    setGmapsStatus('processing');
+    
     let finalUrl = url;
     const isShortLink = url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps') || url.includes('goo.gl');
     
@@ -123,6 +130,9 @@ export default function Page() {
     if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lon)) {
       setEditingTm3(false);
       setCoords(parsed);
+      setGmapsStatus('success');
+    } else {
+      setGmapsStatus('error');
     }
   };
 
@@ -261,15 +271,21 @@ export default function Page() {
               </div>
 
               {/* Google Maps Link Parser */}
-              <div>
+              <div className="relative">
                 <SectionLabel icon={Link} label="Google Maps Link" color="text-red-500/70" />
                 <input 
                   type="text" 
                   value={gmapsLink} 
                   onChange={onGmapsLink} 
                   placeholder="Paste link Google Maps (misal: https://maps.app.goo.gl/...)" 
-                  className={inp} 
+                  className={inp + " pr-8"} 
                 />
+                <div className="absolute right-2.5 top-7">
+                  {gmapsStatus === 'idle' && <Link size={14} className="text-[var(--muted)]" />}
+                  {gmapsStatus === 'processing' && <Loader2 size={14} className="text-blue-500 animate-spin" />}
+                  {gmapsStatus === 'success' && <Check size={14} className="text-emerald-500" />}
+                  {gmapsStatus === 'error' && <AlertCircle size={14} className="text-red-500" />}
+                </div>
               </div>
 
               {/* Divider */}
