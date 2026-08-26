@@ -39,7 +39,17 @@ export async function GET(request: NextRequest) {
           break;
         }
 
-        const absoluteLoc = new URL(loc, currentUrl).toString();
+        let absoluteLoc = currentUrl;
+        try {
+          absoluteLoc = new URL(loc, currentUrl).toString();
+        } catch {
+          if (/^https?:\/\//i.test(loc)) {
+            absoluteLoc = loc;
+          } else {
+            finalUrl = currentUrl;
+            break;
+          }
+        }
         currentUrl = absoluteLoc;
         finalUrl = absoluteLoc;
         redirectCount++;

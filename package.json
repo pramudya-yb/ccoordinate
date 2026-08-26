@@ -15,7 +15,8 @@
     "proj4": "^2.20.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "utm-latlng": "^1.0.8"
+    "utm-latlng": "^1.0.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

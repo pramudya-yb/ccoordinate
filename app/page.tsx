@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { wgs84ToTm3, tm3ToWgs84, TM3_ZONES } from '@/lib/tm3';
 import { ddToDmsString, ddToDms, dmsToDd } from '@/lib/conversion';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { Navigation, Globe, MapPin, Check, Copy, ChevronDown, UploadCloud, Sun, Moon, Link, Loader2, AlertCircle } from 'lucide-react';
 
 /* ── Shared input style using CSS vars ── */
@@ -145,14 +146,71 @@ export default function Page() {
       decodedUrl = decodeURIComponent(url);
     } catch {}
 
+    const dmsPattern = /(\d+)\s*[°º]\s*(\d+)\s*['′]\s*(\d+(?:\.\d+)?)\s*[″"]\s*([NSns])\s*[,+\s]*\s*(\d+)\s*[°º]\s*(\d+)\s*['′]\s*(\d+(?:\.\d+)?)\s*[″"]\s*([EWew])/;
+    const dmsMatch = decodedUrl.match(dmsPattern);
+    if (dmsMatch) {
+      try {
+        const latDeg = parseInt(dmsMatch[1], 10);
+        const latMin = parseInt(dmsMatch[2], 10);
+        const latSec = parseFloat(dmsMatch[3]);
+        const latDir = dmsMatch[4].toUpperCase();
+        const lonDeg = parseInt(dmsMatch[5], 10);
+        const lonMin = parseInt(dmsMatch[6], 10);
+        const lonSec = parseFloat(dmsMatch[7]);
+        const lonDir = dmsMatch[8].toUpperCase();
+        return {
+          lat: dmsToDd(latDeg, latMin, latSec, latDir),
+          lon: dmsToDd(lonDeg, lonMin, lonSec, lonDir)
+        };
+      } catch {}
+    }
+
     const atMatch = decodedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
-    const bangMatch = decodedUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-    if (bangMatch) return { lat: parseFloat(bangMatch[1]), lon: parseFloat(bangMatch[2]) };
-    const queryMatch = decodedUrl.match(/(?:q|query|ll|center)=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (queryMatch) return { lat: parseFloat(queryMatch[1]), lon: parseFloat(queryMatch[2]) };
+    if (atMatch) {
+      const lat = parseFloat(atMatch[1]);
+      const lon = parseFloat(atMatch[2]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        return { lat, lon };
+      }
+    }
+
+    const queryMatch = decodedUrl.match(/(?:q|query|ll|center|cbll|saddr|daddr)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (queryMatch) {
+      const lat = parseFloat(queryMatch[1]);
+      const lon = parseFloat(queryMatch[2]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        return { lat, lon };
+      }
+    }
+
+    const bangLatMatch = decodedUrl.match(/!3d(-?\d+\.\d+)/);
+    const bangLonMatch = decodedUrl.match(/!(?:2d|4d)(-?\d+\.\d+)/);
+    if (bangLatMatch && bangLonMatch) {
+      const lat = parseFloat(bangLatMatch[1]);
+      const lon = parseFloat(bangLonMatch[1]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        return { lat, lon };
+      }
+    }
+
     const pairMatch = decodedUrl.match(/(?:place|search|dir)\/([-+]?\d+\.?\d*),([-+]?\d+\.?\d*)/);
-    if (pairMatch) return { lat: parseFloat(pairMatch[1]), lon: parseFloat(pairMatch[2]) };
+    if (pairMatch) {
+      const lat = parseFloat(pairMatch[1]);
+      const lon = parseFloat(pairMatch[2]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        return { lat, lon };
+      }
+    }
+
+    const generalMatch = decodedUrl.match(/(?:^|[^-\d.])(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)(?:$|[^-\d.])/);
+    if (generalMatch) {
+      const lat = parseFloat(generalMatch[1]);
+      const lon = parseFloat(generalMatch[2]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        return { lat, lon };
+      }
+    }
+
     return null;
   };
 
@@ -210,49 +268,155 @@ export default function Page() {
     } catch { /* ignore */ }
   };
 
+  const processRows = async (rows: Record<string, string>[], originalFilename: string) => {
+    const processedRows = [];
+    const gmapsPattern = /maps\.google\.com|google\.com\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/;
+
+    for (const row of rows) {
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      const findVal = (keys: string[]) => {
+        const foundKey = Object.keys(row).find(k => keys.includes(k.toLowerCase().trim()));
+        return foundKey ? row[foundKey] : undefined;
+      };
+
+      const latVal = findVal(['lat', 'latitude', 'lat/y', 'y_lat']);
+      const lonVal = findVal(['lon', 'longitude', 'lng', 'lon/x', 'x_lon']);
+      if (latVal !== undefined && lonVal !== undefined) {
+        const parsedLat = parseFloat(latVal);
+        const parsedLon = parseFloat(lonVal);
+        if (!isNaN(parsedLat) && !isNaN(parsedLon)) {
+          lat = parsedLat;
+          lon = parsedLon;
+        }
+      }
+
+      if (lat === null || lon === null) {
+        let linkVal = '';
+        for (const key of Object.keys(row)) {
+          const val = String(row[key] || '').trim();
+          if (gmapsPattern.test(val)) {
+            linkVal = val;
+            break;
+          }
+        }
+
+        if (linkVal) {
+          let parsed = parseGmaps(linkVal);
+          if (!parsed) {
+            try {
+              const res = await fetch(`/api/resolve-link?url=${encodeURIComponent(linkVal)}`);
+              const data = await res.json();
+              if (data.finalUrl) {
+                parsed = parseGmaps(data.finalUrl);
+              }
+            } catch {}
+          }
+
+          if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lon)) {
+            lat = parsed.lat;
+            lon = parsed.lon;
+          }
+        }
+      }
+
+      if (lat !== null && lon !== null) {
+        try {
+          const [x, y] = wgs84ToTm3(lat, lon, zone);
+          if (!isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y)) {
+            processedRows.push({
+              ...row,
+              wgs84_lat: lat.toFixed(6),
+              wgs84_lon: lon.toFixed(6),
+              tm3_x: x.toFixed(3),
+              tm3_y: y.toFixed(3),
+              tm3_zone: zone
+            });
+          } else {
+            processedRows.push(row);
+          }
+        } catch {
+          processedRows.push(row);
+        }
+      } else {
+        const xVal = findVal(['x', 'easting', 'tm3_x']);
+        const yVal = findVal(['y', 'northing', 'tm3_y']);
+        const x = xVal ? parseFloat(xVal) : NaN;
+        const y = yVal ? parseFloat(yVal) : NaN;
+
+        if (!isNaN(x) && !isNaN(y)) {
+          try {
+            const [rl, rn] = tm3ToWgs84(x, y, zone);
+            if (!isNaN(rl) && !isNaN(rn) && isFinite(rl) && isFinite(rn)) {
+              processedRows.push({
+                ...row,
+                wgs84_lat: rl.toFixed(6),
+                wgs84_lon: rn.toFixed(6),
+                tm3_zone: zone
+              });
+            } else {
+              processedRows.push(row);
+            }
+          } catch {
+            processedRows.push(row);
+          }
+        } else {
+          processedRows.push(row);
+        }
+      }
+    }
+
+    const isExcel = originalFilename.endsWith('.xlsx') || originalFilename.endsWith('.xls');
+    if (isExcel) {
+      const ws = XLSX.utils.json_to_sheet(processedRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      XLSX.writeFile(wb, 'converted_' + originalFilename);
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([Papa.unparse(processedRows)], { type: 'text/csv;charset=utf-8;' }));
+      a.download = 'converted_' + originalFilename;
+      a.click();
+    }
+    setCsvMsg(`✓ ${processedRows.length} baris`);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setCsvMsg('Memproses…');
-    Papa.parse(file, {
-      header: true, skipEmptyLines: true,
-      complete: (res) => {
-        const rows = (res.data as Record<string, string>[]).map(row => {
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const dataArray = evt.target?.result;
+          if (!dataArray) throw new Error();
+          const wb = XLSX.read(dataArray, { type: 'array' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws) as Record<string, string>[];
+          await processRows(data, file.name);
+        } catch {
+          setCsvMsg('Gagal membaca file Excel');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async (res) => {
           try {
-            const findVal = (keys: string[]) => {
-              const foundKey = Object.keys(row).find(k => keys.includes(k.toLowerCase().trim()));
-              return foundKey ? row[foundKey] : undefined;
-            };
-
-            const latVal = findVal(['lat', 'latitude', 'lat/y', 'y_lat']);
-            const lonVal = findVal(['lon', 'longitude', 'lng', 'lon/x', 'x_lon']);
-            const lat = latVal ? parseFloat(latVal) : NaN;
-            const lon = lonVal ? parseFloat(lonVal) : NaN;
-
-            if (!isNaN(lat) && !isNaN(lon)) {
-              const [x, y] = wgs84ToTm3(lat, lon, zone);
-              return { ...row, tm3_x: x.toFixed(3), tm3_y: y.toFixed(3), tm3_zone: zone };
-            }
-
-            const xVal = findVal(['x', 'easting', 'tm3_x']);
-            const yVal = findVal(['y', 'northing', 'tm3_y']);
-            const x = xVal ? parseFloat(xVal) : NaN;
-            const y = yVal ? parseFloat(yVal) : NaN;
-
-            if (!isNaN(x) && !isNaN(y)) {
-              const [rl, rn] = tm3ToWgs84(x, y, zone);
-              return { ...row, wgs84_lat: rl.toFixed(6), wgs84_lon: rn.toFixed(6), tm3_zone: zone };
-            }
-          } catch { /* skip */ }
-          return row;
-        });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([Papa.unparse(rows)], { type: 'text/csv;charset=utf-8;' }));
-        a.download = 'converted.csv'; a.click();
-        setCsvMsg(`✓ ${rows.length} baris`);
-        if (fileRef.current) fileRef.current.value = '';
-      },
-      error: () => setCsvMsg('Gagal'),
-    });
+            await processRows(res.data as Record<string, string>[], file.name);
+          } catch {
+            setCsvMsg('Gagal memproses file CSV');
+          }
+        },
+        error: () => setCsvMsg('Gagal membaca file CSV'),
+      });
+    }
   };
 
   const dmsLat = ddToDmsString(coords.lat, true);
@@ -385,20 +549,20 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Batch CSV */}
+            {/* Batch Import */}
             <div>
-              <SectionLabel icon={UploadCloud} label="Batch CSV" bgClass="bg-zinc-100 text-zinc-950 border-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-300" />
+              <SectionLabel icon={UploadCloud} label="Batch Import" bgClass="bg-zinc-100 text-zinc-950 border-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-300" />
               <label htmlFor="csv-file"
                 className="flex items-center gap-4 px-3 py-1.5 border-2 border-dashed border-[var(--border)] bg-[var(--inp-bg)] cursor-pointer hover:bg-yellow-400/10 dark:hover:bg-yellow-400/5 transition-all shadow-[3px_3px_0px_0px_var(--border)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none group">
                 <div className="w-7 h-7 bg-white dark:bg-zinc-800 border-2 border-black dark:border-white flex items-center justify-center shrink-0">
                   <UploadCloud size={13} className="text-black dark:text-white" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-black text-[var(--text)]">Upload CSV</p>
-                  <p className="text-[9px] text-[var(--faint)] font-bold">Header: <code>lat, lon</code> atau <code>x, y</code></p>
+                  <p className="text-[11px] font-black text-[var(--text)]">Upload CSV / Excel</p>
+                  <p className="text-[9px] text-[var(--faint)] font-bold font-mono">Header: lat, lon / x, y / kolom link Google Maps</p>
                 </div>
               </label>
-              <input ref={fileRef} id="csv-file" type="file" accept=".csv" onChange={onFile} className="hidden" />
+              <input ref={fileRef} id="csv-file" type="file" accept=".csv,.xls,.xlsx" onChange={onFile} className="hidden" />
               {csvMsg && <p className={`mt-1 text-[10px] font-black ${csvMsg.startsWith('Gagal') ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{csvMsg}</p>}
             </div>
           </div>

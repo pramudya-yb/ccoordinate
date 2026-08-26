@@ -39,5 +39,6 @@ export function ddToDms(dd: number, isLatitude: boolean) {
 
 export function dmsToDd(deg: number, min: number, sec: number, dir: string): number {
   const dd = Math.abs(deg) + Math.abs(min) / 60 + Math.abs(sec) / 3600;
-  return (dir === 'S' || dir === 'W') ? -dd : dd;
+  const upperDir = (dir || '').toUpperCase().trim();
+  return (upperDir === 'S' || upperDir === 'W') ? -dd : dd;
 }
