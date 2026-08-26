@@ -23,8 +23,8 @@ function CopyBtn({ value }: { value: string }) {
 function Row({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-2 border-[var(--border)] bg-[var(--inp-bg)] transition-colors hover:bg-[var(--row-hover)]">
-      <span className={`text-[9px] font-black uppercase tracking-widest w-16 shrink-0 ${accent}`}>{label}</span>
-      <span className="font-mono text-[11px] text-[var(--text)] flex-1 truncate">{value}</span>
+      <span className={`text-[9px] font-black uppercase tracking-widest w-[4.8rem] shrink-0 ${accent}`}>{label}</span>
+      <span className="font-mono text-[10.5px] text-[var(--text)] flex-1 break-all select-all">{value}</span>
       <CopyBtn value={value} />
     </div>
   );
@@ -408,7 +408,7 @@ export default function Page() {
             <div>
               <p className="text-[10px] font-black text-[var(--text)] uppercase tracking-widest mb-3 bg-black dark:bg-white text-white dark:text-black inline-block px-2 py-0.5 border border-black dark:border-white">Hasil Konversi</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {/* Group 1: WGS84 */}
                 <div className="space-y-1.5">
                   <p className="text-[8px] font-black text-[var(--text)] uppercase tracking-wider px-1">WGS84 Geografis</p>
@@ -418,6 +418,8 @@ export default function Page() {
                   <Row label="DMS Lon"   value={dmsLon} accent="text-sky-600 dark:text-sky-400 font-extrabold" />
                   <Row label="DD Pair"   value={`${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)}`} accent="text-sky-600 dark:text-sky-400 font-extrabold" />
                 </div>
+
+                <div className="border-t-2 border-black dark:border-white border-dashed my-1" />
 
                 {/* Group 2: TM3 */}
                 <div className="space-y-1.5">
