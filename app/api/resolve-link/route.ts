@@ -8,32 +8,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'URL required' }, { status: 400 });
   }
 
+  let currentUrl = url.trim();
+  if (!/^https?:\/\//i.test(currentUrl)) {
+    currentUrl = 'https://' + currentUrl;
+  }
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    let redirectCount = 0;
+    const maxRedirects = 10;
+    let finalUrl = currentUrl;
 
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
+    while (redirectCount < maxRedirects) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
 
-    clearTimeout(timeout);
+      try {
+        const response = await fetch(currentUrl, {
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
 
-    const locationHeader = response.headers.get('location') || response.headers.get('Location');
+        clearTimeout(timeout);
 
-    if (locationHeader) {
-      return NextResponse.json({ 
-        url: locationHeader,
-        finalUrl: locationHeader
-      });
+        const loc = response.headers.get('location') || response.headers.get('Location');
+        if (!loc) {
+          finalUrl = currentUrl;
+          break;
+        }
+
+        const absoluteLoc = new URL(loc, currentUrl).toString();
+        currentUrl = absoluteLoc;
+        finalUrl = absoluteLoc;
+        redirectCount++;
+
+        if (response.status < 300 || response.status >= 400) {
+          break;
+        }
+      } catch (err) {
+        clearTimeout(timeout);
+        if (redirectCount > 0) {
+          break;
+        }
+        throw err;
+      }
     }
 
     return NextResponse.json({ 
-      error: 'No redirect location found' 
-    }, { status: 404 });
+      url: finalUrl,
+      finalUrl: finalUrl
+    });
   } catch (error: unknown) {
     const err = error as Error;
     return NextResponse.json({ 

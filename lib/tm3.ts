@@ -18,6 +18,7 @@ export const TM3_ZONES = [
   { label: '53.1', meridian: 133.5 },
   { label: '53.2', meridian: 136.5 },
   { label: '54.1', meridian: 139.5 },
+  { label: '54.2', meridian: 142.5 },
 ];
 
 const WGS84 = 'EPSG:4326';

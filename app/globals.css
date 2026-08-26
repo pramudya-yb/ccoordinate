@@ -14,44 +14,48 @@ input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 input[type=number] { -moz-appearance: textfield; }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { border-radius: 4px; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border: 1px solid var(--bg); }
 
-/* ── Light theme (default) ── */
+/* ── Neo Brutalism Theme Variables ── */
 :root {
-  --bg:        #f0f4ff;
-  --card:      #ffffff;
-  --border:    rgba(59,130,246,0.15);
-  --divider:   rgba(0,0,0,0.06);
-  --text:      #0f172a;
-  --muted:     #64748b;
-  --faint:     #94a3b8;
-  --inp-bg:    #f8faff;
-  --inp-border:#bfdbfe;
-  --inp-focus: #3b82f6;
-  --row-hover: rgba(59,130,246,0.05);
-  --glow1:     rgba(147,197,253,0.4);
-  --glow2:     rgba(165,180,252,0.3);
-  --scrollbar: #bfdbfe;
+  --bg:          #fffbeb; /* Cream warm paper */
+  --card:        #ffffff;
+  --border:      #000000;
+  --divider:     #000000;
+  --text:        #000000;
+  --muted:       #374151;
+  --faint:       #6b7280;
+  --inp-bg:      #ffffff;
+  --inp-border:  #000000;
+  --inp-focus:   #facc15; /* Vibrant Yellow */
+  --row-hover:   rgba(0, 0, 0, 0.04);
+  --scrollbar:   #000000;
+  
+  /* Neo Brutalist shadow offsets */
+  --brutal-shadow: 6px 6px 0px 0px #000000;
+  --brutal-shadow-sm: 3px 3px 0px 0px #000000;
+  --brutal-shadow-active: 0px 0px 0px 0px #000000;
 }
 
-/* ── Dark theme ── */
 .dark {
-  --bg:        #060d1a;
-  --card:      rgba(10,22,40,0.85);
-  --border:    rgba(255,255,255,0.07);
-  --divider:   rgba(255,255,255,0.05);
-  --text:      #e2e8f0;
-  --muted:     #64748b;
-  --faint:     #334155;
-  --inp-bg:    #0b1628;
-  --inp-border:rgba(30,58,138,0.6);
-  --inp-focus: rgba(59,130,246,0.4);
-  --row-hover: rgba(255,255,255,0.03);
-  --glow1:     rgba(30,58,138,0.5);
-  --glow2:     rgba(49,46,129,0.4);
-  --scrollbar: #1e3a5f;
+  --bg:          #121212; /* Dark brutalist gray */
+  --card:        #1c1c1c;
+  --border:      #ffffff;
+  --divider:     #ffffff;
+  --text:        #ffffff;
+  --muted:       #d1d5db;
+  --faint:       #9ca3af;
+  --inp-bg:      #121212;
+  --inp-border:  #ffffff;
+  --inp-focus:   #facc15; /* Vibrant Yellow */
+  --row-hover:   rgba(255, 255, 255, 0.06);
+  --scrollbar:   #ffffff;
+  
+  --brutal-shadow: 6px 6px 0px 0px #000000;
+  --brutal-shadow-sm: 3px 3px 0px 0px #000000;
+  --brutal-shadow-active: 0px 0px 0px 0px #000000;
 }
 
 body { background: var(--bg); color: var(--text); }
